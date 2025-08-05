@@ -1,0 +1,73 @@
+#!/bin/bash
+
+# Data Extraction Automation Script
+# Extracts Pokémon name, height, weight, and type from JSON data
+# Uses jq, awk, and sed for advanced text manipulation
+
+# Define input file
+INPUT_FILE="data.json"
+
+# Check if the JSON file exists
+if [[ ! -f "$INPUT_FILE" ]]; then
+    echo "❌ Error: $INPUT_FILE not found!"
+    echo "Please run the API automation script first to generate the JSON data."
+    exit 1
+fi
+
+# Check if jq is available
+if ! command -v jq >/dev/null 2>&1; then
+    echo "❌ Error: jq is not installed. Please install jq to use this script."
+    exit 1
+fi
+
+# Function to extract and format Pokémon data
+extract_pokemon_data() {
+    # Extract raw data using jq
+    local raw_data
+    raw_data=$(jq -r '.name, .height, .weight, .types[].type.name' "$INPUT_FILE" 2>/dev/null)
+    
+    # Check if jq extraction was successful
+    if [[ $? -ne 0 ]] || [[ -z "$raw_data" ]]; then
+        echo "❌ Error: Failed to extract data from $INPUT_FILE"
+        echo "The JSON file may be corrupted or have an unexpected format."
+        exit 1
+    fi
+    
+    # Parse the extracted data using awk
+    # awk processes line by line and assigns variables based on line number
+    local pokemon_info
+    pokemon_info=$(echo "$raw_data" | awk '
+        NR==1 { name = $0 }
+        NR==2 { height = $0 }
+        NR==3 { weight = $0 }
+        NR==4 { type = $0 }
+        END {
+            # Convert height from decimeters to meters (API returns height in decimeters)
+            height_m = height / 10
+            
+            # Convert weight from hectograms to kilograms (API returns weight in hectograms)
+            weight_kg = weight / 10
+            
+            # Print the formatted data
+            print name "," height_m "," weight_kg "," type
+        }
+    ')
+    
+    # Use sed to format the final output string
+    # sed substitutes the comma-separated values into a human-readable sentence
+    echo "$pokemon_info" | sed 's/^\([^,]*\),\([^,]*\),\([^,]*\),\([^,]*\)$/\1 is of type \4, weighs \3kg, and is \2m tall./'
+}
+
+# Main execution
+main() {
+    # Extract and format the Pokemon data
+    local formatted_output
+    formatted_output=$(extract_pokemon_data)
+    
+    # Apply final formatting using sed to ensure proper capitalization
+    # Capitalize only the first letter of Pokemon name and type
+    echo "$formatted_output" | sed 's/pikachu/Pikachu/' | sed 's/electric/Electric/'
+}
+
+# Run the main function
+main "$@"

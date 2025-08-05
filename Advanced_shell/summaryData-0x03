@@ -1,0 +1,45 @@
+#!/bin/bash
+
+# Summarize Pokémon Data Script
+# Reads all JSON files in pokemon_data/, extracts name, height, and weight
+# Generates a CSV report and calculates averages using awk
+
+POKEMON_DIR="pokemon_data"
+CSV_FILE="pokemon_report.csv"
+
+# Check if jq is available
+if ! command -v jq >/dev/null 2>&1; then
+    echo "❌ Error: jq is not installed. Please install jq to use this script."
+    exit 1
+fi
+
+# Check if the directory exists
+if [[ ! -d "$POKEMON_DIR" ]]; then
+    echo "❌ Error: $POKEMON_DIR directory not found!"
+    exit 1
+fi
+
+# Write CSV header
+echo "Name,Height (m),Weight (kg)" > "$CSV_FILE"
+
+# Extract data from each JSON file and append to CSV
+for file in "$POKEMON_DIR"/*.json; do
+    name=$(jq -r '.name' "$file" | sed 's/.*/\u&/')
+    height=$(jq -r '.height' "$file")
+    weight=$(jq -r '.weight' "$file")
+    # Convert height from decimeters to meters
+    height_m=$(awk "BEGIN {printf \"%.2f\", $height/10}")
+    # Convert weight from hectograms to kilograms
+    weight_kg=$(awk "BEGIN {printf \"%.2f\", $weight/10}")
+    echo "$name,$height_m,$weight_kg" >> "$CSV_FILE"
+    # ...existing code...
+done
+
+# Print CSV report location
+echo "CSV Report generated at: $CSV_FILE"
+
+# Print CSV contents
+cat "$CSV_FILE"
+
+# Calculate averages using awk
+awk -F',' 'NR>1 {h+=$2; w+=$3; c++} END {if(c>0) printf "\nAverage Height: %.2f m\nAverage Weight: %.2f kg\n", h/c, w/c}' "$CSV_FILE"

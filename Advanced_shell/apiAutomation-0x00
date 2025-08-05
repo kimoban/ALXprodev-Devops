@@ -1,0 +1,104 @@
+#!/bin/bash
+
+# API Request Automation Script
+# Fetches Pikachu data from the Pokémon API and saves to data.json
+# Logs errors to errors.txt if the request fails
+
+# Define variables
+API_URL="https://pokeapi.co/api/v2/pokemon/pikachu"
+OUTPUT_FILE="data.json"
+ERROR_FILE="errors.txt"
+
+# Function to log errors
+log_error() {
+    local error_message="$1"
+    local timestamp=$(date '+%Y-%m-%d %H:%M:%S')
+    echo "[$timestamp] ERROR: $error_message" >> "$ERROR_FILE"
+}
+
+# Function to make API request
+fetch_pokemon_data() {
+    echo "Fetching Pikachu data from Pokémon API..."
+    
+    # Make the API request using curl
+    # -s: silent mode (no progress bar)
+    # -S: show errors even in silent mode
+    # -f: fail silently on HTTP errors
+    # -w: write format to check HTTP status code
+    local http_status
+    local response
+    
+    response=$(curl -s -S -f -w "%{http_code}" "$API_URL" 2>/dev/null)
+    http_status="${response: -3}"  # Get last 3 characters (HTTP status code)
+    response="${response%???}"     # Remove last 3 characters to get actual response
+    
+    # Check if the request was successful
+    if [[ "$http_status" -eq 200 ]]; then
+        # Save the response to data.json
+        echo "$response" > "$OUTPUT_FILE"
+        echo "✅ Success! Pikachu data saved to $OUTPUT_FILE"
+        
+        # Verify the JSON is valid
+        if command -v jq >/dev/null 2>&1; then
+            if jq empty "$OUTPUT_FILE" >/dev/null 2>&1; then
+                echo "✅ JSON file is valid"
+            else
+                log_error "Invalid JSON response received"
+                return 1
+            fi
+        else
+            echo "⚠️  Note: 'jq' is not installed. Cannot verify JSON validity."
+        fi
+        
+        return 0
+    else
+        # Log the error
+        local error_msg="API request failed with HTTP status: $http_status"
+        log_error "$error_msg"
+        echo "❌ Error: $error_msg"
+        echo "Check $ERROR_FILE for details."
+        return 1
+    fi
+}
+
+# Function to handle network errors
+handle_network_error() {
+    local error_msg="Network error: Unable to connect to the Pokémon API"
+    log_error "$error_msg"
+    echo "❌ $error_msg"
+    echo "Please check your internet connection and try again."
+    echo "Error logged to $ERROR_FILE"
+}
+
+# Main execution
+main() {
+    echo "=== Pokémon API Request Automation ==="
+    echo "Target: $API_URL"
+    echo "Output file: $OUTPUT_FILE"
+    echo "Error log: $ERROR_FILE"
+    echo ""
+    
+    # Check if curl is available
+    if ! command -v curl >/dev/null 2>&1; then
+        local error_msg="curl is not installed. Please install curl to use this script."
+        log_error "$error_msg"
+        echo "❌ $error_msg"
+        exit 1
+    fi
+    
+    # Attempt to fetch the data
+    if fetch_pokemon_data; then
+        echo ""
+        echo "🎉 Task completed successfully!"
+        echo "You can view the data using: jq . < $OUTPUT_FILE"
+    else
+        # Check if it's a network error
+        if ! curl -s --connect-timeout 5 "$API_URL" >/dev/null 2>&1; then
+            handle_network_error
+        fi
+        exit 1
+    fi
+}
+
+# Run the main function
+main "$@"

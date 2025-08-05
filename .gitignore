@@ -1,0 +1,23 @@
+# Temporary files and logs
+*.log
+*.tmp
+*~
+
+# Error and success logs (these are generated during execution)
+Advanced_shell/errors.txt
+Advanced_shell/batch_errors.txt
+Advanced_shell/parallel_errors.txt
+Advanced_shell/parallel_success.txt
+
+# IDE and editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS generated files
+.DS_Store
+Thumbs.db
+
+# Process tracking directories (temporary)
+Advanced_shell/process_info/
