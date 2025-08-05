@@ -178,7 +178,7 @@ fetch_pokemon_with_retry() {
     return 1
 }
 
-# Function to monitor background processes
+# Function to monitor background processes with jobs command
 monitor_processes() {
     local total_pokemon=${#POKEMON_LIST[@]}
     local completed=0
@@ -190,6 +190,13 @@ monitor_processes() {
     while [[ $completed -lt $total_pokemon ]] && [[ $wait_time -lt $max_wait ]]; do
         completed=0
         local running_processes=()
+        
+        # Use jobs command to check background processes
+        local active_jobs=$(jobs -r | wc -l)
+        if [[ $active_jobs -gt 0 ]]; then
+            echo -e "${BLUE}Active background jobs: $active_jobs${NC}"
+            jobs -l
+        fi
         
         # Check status of each Pokémon
         for pokemon in "${POKEMON_LIST[@]}"; do
@@ -221,6 +228,9 @@ monitor_processes() {
     
     if [[ $wait_time -ge $max_wait ]]; then
         echo -e "${RED}⚠️ Timeout reached while waiting for processes to complete${NC}"
+        echo "Killing remaining background processes..."
+        # Kill any remaining background jobs
+        jobs -p | xargs -r kill
         return 1
     fi
     
@@ -289,9 +299,21 @@ display_results() {
     fi
 }
 
-# Function to cleanup temporary files
+# Function to cleanup temporary files and kill background processes
 cleanup() {
-    echo "🧹 Cleaning up temporary files..."
+    echo "🧹 Cleaning up temporary files and processes..."
+    
+    # Check for any remaining background jobs
+    local remaining_jobs=$(jobs -p)
+    if [[ -n "$remaining_jobs" ]]; then
+        echo "Terminating remaining background processes..."
+        jobs -p | xargs -r kill
+        sleep 1
+        # Force kill if still running
+        jobs -p | xargs -r kill -9 2>/dev/null
+    fi
+    
+    # Remove temporary directory
     rm -rf "$PROCESS_DIR"
 }
 
@@ -336,8 +358,12 @@ main() {
         pids+=($!)
     done
     
-    echo -e "${BLUE}✅ All $total_pokemon background processes started${NC}"
+    echo -e "${BLUE}✅ All ${#POKEMON_LIST[@]} background processes started${NC}"
     echo "Process IDs: ${pids[*]}"
+    
+    # Display current background jobs
+    echo -e "${BLUE}Background jobs status:${NC}"
+    jobs -l
     echo ""
     
     # Monitor processes
@@ -345,9 +371,22 @@ main() {
     
     # Wait for all background processes to complete
     echo -e "${BLUE}⏳ Waiting for all background processes to complete...${NC}"
-    for pid in "${pids[@]}"; do
-        wait $pid
-    done
+    
+    # Check if any jobs are still running before waiting
+    if [[ $(jobs -r | wc -l) -gt 0 ]]; then
+        echo "Waiting for $(jobs -r | wc -l) remaining background jobs..."
+        for pid in "${pids[@]}"; do
+            wait $pid
+        done
+    fi
+    
+    # Final jobs check
+    if [[ $(jobs | wc -l) -gt 0 ]]; then
+        echo "Final background jobs status:"
+        jobs -l
+    else
+        echo "All background processes completed successfully."
+    fi
     
     # Display results
     display_results
