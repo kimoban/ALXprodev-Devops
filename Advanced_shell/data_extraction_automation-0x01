@@ -23,50 +23,41 @@ fi
 # Function to extract and format Pokémon data
 extract_pokemon_data() {
     # Extract raw data using jq
-    local raw_data
-    raw_data=$(jq -r '.name, .height, .weight, .types[].type.name' "$INPUT_FILE" 2>/dev/null)
+    local name height weight type
+    
+    # Extract individual fields using jq
+    name=$(jq -r '.name' "$INPUT_FILE" 2>/dev/null)
+    height=$(jq -r '.height' "$INPUT_FILE" 2>/dev/null)
+    weight=$(jq -r '.weight' "$INPUT_FILE" 2>/dev/null)
+    type=$(jq -r '.types[].type.name' "$INPUT_FILE" 2>/dev/null)
     
     # Check if jq extraction was successful
-    if [[ $? -ne 0 ]] || [[ -z "$raw_data" ]]; then
+    if [[ $? -ne 0 ]] || [[ -z "$name" ]] || [[ -z "$height" ]] || [[ -z "$weight" ]] || [[ -z "$type" ]]; then
         echo "❌ Error: Failed to extract data from $INPUT_FILE"
         echo "The JSON file may be corrupted or have an unexpected format."
         exit 1
     fi
     
-    # Parse the extracted data using awk
-    # awk processes line by line and assigns variables based on line number
-    local pokemon_info
-    pokemon_info=$(echo "$raw_data" | awk '
-        NR==1 { name = $0 }
-        NR==2 { height = $0 }
-        NR==3 { weight = $0 }
-        NR==4 { type = $0 }
-        END {
-            # Convert height from decimeters to meters (API returns height in decimeters)
-            height_m = height / 10
-            
-            # Convert weight from hectograms to kilograms (API returns weight in hectograms)
-            weight_kg = weight / 10
-            
-            # Print the formatted data
-            print name "," height_m "," weight_kg "," type
-        }
-    ')
+    # Convert height from decimeters to meters using awk
+    local formatted_height
+    formatted_height=$(awk "BEGIN {printf \"%.1f\", $height/10}")
     
-    # Use sed to format the final output string
-    # sed substitutes the comma-separated values into a human-readable sentence
-    echo "$pokemon_info" | sed 's/^\([^,]*\),\([^,]*\),\([^,]*\),\([^,]*\)$/\1 is of type \4, weighs \3kg, and is \2m tall./'
+    # Convert weight from hectograms to kilograms using awk
+    local formatted_weight
+    formatted_weight=$(awk "BEGIN {printf \"%.0f\", $weight/10}")
+    
+    # Capitalize the first letter of name and type using sed
+    name=$(echo "$name" | sed 's/.*/\u&/')
+    type=$(echo "$type" | sed 's/.*/\u&/')
+    
+    # Format the final output string using the required format
+    echo "$name is of type $type, weighs ${formatted_weight}kg, and is ${formatted_height}m tall."
 }
 
 # Main execution
 main() {
     # Extract and format the Pokemon data
-    local formatted_output
-    formatted_output=$(extract_pokemon_data)
-    
-    # Apply final formatting using sed to ensure proper capitalization
-    # Capitalize only the first letter of Pokemon name and type
-    echo "$formatted_output" | sed 's/pikachu/Pikachu/' | sed 's/electric/Electric/'
+    extract_pokemon_data
 }
 
 # Run the main function
