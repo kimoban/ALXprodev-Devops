@@ -35,7 +35,7 @@ A comprehensive shell scripting project demonstrating:
 
 1. **Clone the repository:**
    ```bash
-   git clone https://github.com/YOUR_USERNAME/ALXprodev-Devops.git
+   git clone https://github.com/kimoban/ALXprodev-Devops.git
    cd ALXprodev-Devops
    ```
 
